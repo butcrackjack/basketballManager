@@ -1,0 +1,835 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>NBA season simulator: attribute spec (v1)</h1>
+<p>This sheet defines every player rating, player tendency, and coach setting in the model. For each one it records what it means, what data it's estimated from, which possession-engine event it drives, and how much confidence the data supports.</p>
+<h2>Conventions</h2>
+<p><strong>Two scales.</strong> Every rating is stored internally in the unit the engine uses, usually a probability or a rate. It is shown on a 25–99 display scale by league percentile. The engine never reads the display number.</p>
+<p><strong>Shrinkage.</strong> Every measured value blends the player's observed rate with a prior (the average for his position and role), weighted by sample size. Recent seasons count more, for example 3/2/1 across the last three.</p>
+<p><strong>Two kinds of tendency.</strong></p>
+<ul>
+<li><em>Distribution</em> tendencies split a single decision into shares that sum to 100%, like shot type.</li>
+<li><em>Rate</em> tendencies are how often a player does something when the chance arises, like drives per touch.</li>
+</ul>
+<p><strong>Context-netting.</strong> Player ratings and tendencies are estimated net of the context they were produced in, such as teammate spacing and team system. The engine then adds context back, so nothing is counted twice.</p>
+<p><strong>Source tags.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Measured</td>
+<td>Estimated directly from public stats</td>
+</tr>
+<tr>
+<td>Proxied</td>
+<td>Estimated indirectly from related stats; noisier</td>
+</tr>
+<tr>
+<td>Calibrated</td>
+<td>Fitted so the simulation reproduces a real observed outcome. Used where the data can't separate two parameters</td>
+</tr>
+<tr>
+<td>Assigned</td>
+<td>No public data; set by design. In-game effect must be small and average out to zero</td>
+</tr>
+<tr>
+<td>Derived</td>
+<td>Computed from other attributes rather than stored</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Projection mode.</strong> A toggle that neutralizes every Assigned in-game effect, so win projections rest only on data-backed parameters.</p>
+<h2>Data key</h2>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th><code>nba_api</code> endpoint(s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Box score, per-100, advanced</td>
+<td><code>leaguedashplayerstats</code>, <code>leaguedashteamstats</code></td>
+</tr>
+<tr>
+<td>Shot locations</td>
+<td><code>shotchartdetail</code></td>
+</tr>
+<tr>
+<td>Play-by-play (shot descriptions, fouls, substitutions)</td>
+<td><code>playbyplayv3</code></td>
+</tr>
+<tr>
+<td>Tracking (speed, drives, touches, passing, catch-and-shoot, pull-up, rebounding)</td>
+<td><code>leaguedashptstats</code></td>
+</tr>
+<tr>
+<td>Play types</td>
+<td><code>synergyplaytypes</code> (player and team)</td>
+</tr>
+<tr>
+<td>Hustle</td>
+<td><code>leaguehustlestatsplayer</code></td>
+</tr>
+<tr>
+<td>Defense and rim protection</td>
+<td><code>leaguedashptdefend</code></td>
+</tr>
+<tr>
+<td>Matchups (who guarded whom)</td>
+<td><code>leagueseasonmatchups</code></td>
+</tr>
+<tr>
+<td>Opponent shots by closest defender</td>
+<td><code>leaguedashoppptshot</code></td>
+</tr>
+<tr>
+<td>Combine measurements and drills</td>
+<td><code>draftcombineplayeranthro</code>, <code>draftcombinedrillresults</code></td>
+</tr>
+<tr>
+<td>Lineups</td>
+<td><code>leaguedashlineups</code></td>
+</tr>
+<tr>
+<td>Defensive impact</td>
+<td>Compute RAPM from play-by-play lineup stints, or use a public RAPM-family metric</td>
+</tr>
+</tbody>
+</table>
+<p>Verify endpoint names against the current <code>nba_api</code> docs. Coverage start years differ by dataset; tracking, play-type, hustle, and matchup data only exist from the mid-2010s onward.</p>
+<hr>
+<h1>Player layer</h1>
+<h2>Physical</h2>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Speed</td>
+<td>Straight-line speed with and without the ball</td>
+<td>Combine ¾-court sprint; transition frequency; tracking speed (role-adjusted)</td>
+<td>Transition outcomes, running the floor, speed mismatches</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Agility</td>
+<td>Lateral quickness and change of direction</td>
+<td>Combine lane agility and shuttle; drive success; results guarding guards in matchup data</td>
+<td>Blow-by chance on drives at both ends; switchability</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Vertical</td>
+<td>Leaping ability</td>
+<td>Combine max vertical; dunk rate; block and offensive rebound rates</td>
+<td>Dunk access, block chance, rebound contests</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Strength</td>
+<td>Winning physical contact</td>
+<td>Weight; post-up efficiency at both ends; and-one rate; screen assists</td>
+<td>Post-ups, contact finishing, screen quality, box-outs</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Stamina</td>
+<td>How long performance holds up</td>
+<td>Minutes per game; typical stint length</td>
+<td>Fatigue build-up within stints; maximum minutes</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Height</td>
+<td>Height without shoes</td>
+<td>Combine measurements; listed height</td>
+<td>Mismatch detection, contests, rebounding, post play</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Wingspan</td>
+<td>Arm span</td>
+<td>Combine measurements; imputed from height and position when missing</td>
+<td>Contests, deflections, blocks, steals</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Durability</td>
+<td>Resistance to injury</td>
+<td>Games-missed history, injury types, age</td>
+<td>Injury chance per game; injury length</td>
+<td>Measured</td>
+</tr>
+</tbody>
+</table>
+<h2>Mental</h2>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Off-ball movement</td>
+<td>Getting open without the ball</td>
+<td>Cut frequency and efficiency; catch-and-shoot volume relative to role</td>
+<td>Chance of getting open off the ball; cut opportunities</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Offensive decisions</td>
+<td>Avoiding turnovers relative to ball-handling load</td>
+<td>Turnovers per touch and per usage; bad-pass vs lost-ball split</td>
+<td>Turnover chance per action</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Shot IQ</td>
+<td>Taking good shots rather than forcing bad ones</td>
+<td>Expected eFG% of his shot diet compared with role average</td>
+<td>Quality of shot chosen; forced shots late in the clock</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Vision</td>
+<td>Seeing and creating passing opportunities</td>
+<td>Potential assists per pass; assist points created</td>
+<td>Chance a pass finds the best-positioned teammate</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Aggression</td>
+<td>Defensive physicality (see open decisions)</td>
+<td>Foul rate left unexplained by block, steal, and contest events</td>
+<td>Foul chance on contests and post defense; small boost to contest effectiveness</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Hustle</td>
+<td>Effort plays</td>
+<td>Deflections, loose balls recovered, contests, box-outs per 100</td>
+<td>Loose-ball recoveries, extra contests, second-effort rebounds</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Defensive positioning</td>
+<td>Help defense and rotations</td>
+<td>Defensive impact after removing on-ball defense, blocks, and steals; rim contests as a help defender</td>
+<td>Help effectiveness, rotation timing, defensive rebound position</td>
+<td>Proxied</td>
+</tr>
+</tbody>
+</table>
+<h2>Technical</h2>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Layup</td>
+<td>Finishing layups</td>
+<td>FG% on layups (play-by-play shot descriptions)</td>
+<td>Layup make chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Close shot</td>
+<td>Floaters, hooks, and short shots in the paint outside the restricted area</td>
+<td>FG% by zone and shot description</td>
+<td>Close-shot make chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Mid range (catch-and-shoot)</td>
+<td>Two-point jumpers off the catch</td>
+<td>Tracking catch-and-shoot splits; shot chart</td>
+<td>Make chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Mid range (pull-up)</td>
+<td>Two-point jumpers off the dribble</td>
+<td>Tracking pull-up splits; shot chart</td>
+<td>Make chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Three (catch-and-shoot)</td>
+<td>Threes off the catch</td>
+<td>Tracking catch-and-shoot splits; FT% as part of the prior</td>
+<td>Make chance; shooting gravity for spacing</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Three (pull-up)</td>
+<td>Threes off the dribble</td>
+<td>Tracking pull-up splits; FT% as part of the prior</td>
+<td>Make chance; gravity; creation for ball-handler scarcity</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Free throw</td>
+<td>Free-throw shooting</td>
+<td>FT%</td>
+<td>Free-throw make chance; prior for jump shooting</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Post shot</td>
+<td>Scoring from post-ups</td>
+<td>Post-up efficiency; hook-shot FG%</td>
+<td>Post-shot make chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Ball handle</td>
+<td>Keeping and advancing the ball under pressure</td>
+<td>Lost-ball turnovers per drive and touch; drive efficiency; turnover rates as isolation and pick-and-roll ball handler</td>
+<td>Turnovers under pressure; beating a defender off the dribble; lineup handling score</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Passing</td>
+<td>Executing passes accurately</td>
+<td>Bad-pass turnovers per pass</td>
+<td>Turnover chance on a pass; quality of the resulting shot</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Defensive rebounding</td>
+<td>Securing defensive rebounds</td>
+<td>DREB%; contested defensive rebound share</td>
+<td>Share of defensive rebounds won</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Offensive rebounding</td>
+<td>Securing offensive rebounds when crashing</td>
+<td>Offensive rebounds per tracked rebound chance (net of crash tendency)</td>
+<td>Share of offensive rebounds won when crashing</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Perimeter defense</td>
+<td>Guarding on the perimeter</td>
+<td>Matchup data (opponent shooting vs expected); defensive impact</td>
+<td>Modifier on opponent jumpers and drives</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Interior defense</td>
+<td>Protecting the rim and post</td>
+<td>Opponent FG% at the rim when he defends it; post-up defense</td>
+<td>Modifier on opponent rim, close, and post shots</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Block</td>
+<td>Blocking shots without fouling</td>
+<td>Blocks per opponent two-point attempt while on floor; fouls, fitted jointly with Block tendency</td>
+<td>Success chance on a block attempt</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Steal</td>
+<td>Stealing without fouling</td>
+<td>Steals and deflections per 100; fouls, fitted jointly with Steal tendency</td>
+<td>Success chance on a steal attempt</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Draw foul</td>
+<td>Earning fouls when seeking contact</td>
+<td>Shooting fouls drawn per shot; and-ones; fitted given Flop tendency</td>
+<td>Chance a contact-seeking attempt is called a foul</td>
+<td>Calibrated</td>
+</tr>
+</tbody>
+</table>
+<h2>Tendencies</h2>
+<table>
+<thead>
+<tr>
+<th>Tendency</th>
+<th>Type</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Drive</td>
+<td>Rate</td>
+<td>Drives per half-court touch</td>
+<td>Tracking drives and touches</td>
+<td>Whether a touch becomes a drive</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Shot distribution</td>
+<td>Distribution</td>
+<td>Split across layup, close, post, mid (C&amp;S), mid (pull-up), three (C&amp;S), three (pull-up)</td>
+<td>Shot chart, play-by-play, tracking splits; net of team system</td>
+<td>Which shot is taken</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Has ball</td>
+<td>Rate</td>
+<td>Share of team half-court time as primary handler</td>
+<td>Tracking time of possession; front-court touches</td>
+<td>Who initiates possessions</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Iso</td>
+<td>Rate</td>
+<td>How often he isolates when initiating</td>
+<td>Isolation frequency (play types)</td>
+<td>Isolation vs other actions</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Call for screen</td>
+<td>Rate</td>
+<td>How often he uses a ball screen when initiating</td>
+<td>Pick-and-roll ball-handler frequency</td>
+<td>Pick-and-roll vs other actions</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Pass</td>
+<td>Rate</td>
+<td>Passing rather than shooting or driving on a touch</td>
+<td>Tracking passes and touches</td>
+<td>Pass decision</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Dunk</td>
+<td>Rate</td>
+<td>Share of dunk-accessible rim attempts taken as dunks</td>
+<td>Fitted so simulated dunk rate matches real</td>
+<td>Dunk vs layup at the rim</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Flop</td>
+<td>Rate</td>
+<td>How often he seeks contact to draw a foul</td>
+<td>No public data</td>
+<td>Foul-hunting attempts; failed attempts lower shot quality</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Block</td>
+<td>Rate</td>
+<td>How often he goes for blocks</td>
+<td>Fitted jointly with Block rating to blocks and fouls</td>
+<td>Block attempts</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Steal</td>
+<td>Rate</td>
+<td>How often he gambles for steals</td>
+<td>Fitted jointly with Steal rating to steals, deflections, and fouls</td>
+<td>Steal attempts</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Screen</td>
+<td>Rate</td>
+<td>Screens set per possession</td>
+<td>Screen assists; roll-man frequency</td>
+<td>Who sets screens</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Pop/roll</td>
+<td>Distribution</td>
+<td>Rolling vs popping after a screen (see open decisions)</td>
+<td>Location of roll-man shots (rim vs three)</td>
+<td>Screener's action after the screen</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Cut</td>
+<td>Rate</td>
+<td>Cuts per off-ball possession</td>
+<td>Cut frequency (play types)</td>
+<td>Cutting actions</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Defensive rebound</td>
+<td>Rate</td>
+<td>Boxing out vs leaking out</td>
+<td>Box-outs; transition frequency</td>
+<td>Rebound contest vs leak-out</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Offensive rebound</td>
+<td>Rate</td>
+<td>Crash rate after team misses</td>
+<td>Tracking offensive rebound chances</td>
+<td>Crash vs get back</td>
+<td>Measured</td>
+</tr>
+</tbody>
+</table>
+<h2>Hidden attributes</h2>
+<p>All in-game effects here average out to zero across the league, stay small, and switch off in projection mode.</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>In-game effect</th>
+<th>Off-court role</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Professionalism</td>
+<td>None</td>
+<td>Progression rate; aging decline</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Consistency</td>
+<td>Game-to-game performance variance</td>
+<td>None</td>
+<td>Proxied (mostly noise; keep small)</td>
+</tr>
+<tr>
+<td>Pressure</td>
+<td>Modifier in playoff and high-stakes games</td>
+<td>Morale under scrutiny</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Clutch</td>
+<td>Modifier in the last five minutes when within five points</td>
+<td>None</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Loyalty</td>
+<td>None</td>
+<td>Re-signing; reactions to trades</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Controversy</td>
+<td>None</td>
+<td>Off-court incidents; chemistry events</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Sportsmanship</td>
+<td>Flagrant-foul chance</td>
+<td>Reputation</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Temperament</td>
+<td>Technical fouls and ejections; reaction to adversity</td>
+<td>Morale swings</td>
+<td>Proxied (technicals, ejections)</td>
+</tr>
+<tr>
+<td>Leadership</td>
+<td>Small boost to teammates' consistency</td>
+<td>Chemistry; morale</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Determination</td>
+<td>None</td>
+<td>Progression; injury recovery</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Versatility</td>
+<td>Positions he can credibly guard and play</td>
+<td>Position penalties in lineup selection; switchability</td>
+<td>Derived from physical and defensive ratings</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h1>Team / coach layer</h1>
+<p>Every setting belongs to the coach, not the team. Estimate it from the coach's history across rosters, net of what those rosters would have done on their own, so his style moves with him when he changes teams. Every setting is also a base preference that the engine adjusts for the personnel on the floor.</p>
+<h2>Offense</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pace</td>
+<td>Rate</td>
+<td>How early in the shot clock the team shoots in the half court, plus how often it pushes in transition</td>
+<td>Seconds per possession (play-by-play); transition frequency</td>
+<td>Possession length; transition chance</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Shot preference</td>
+<td>Distribution modifier</td>
+<td>Tilt toward layup, close, mid, or three</td>
+<td>Team shot distribution minus what the roster's tendencies predict</td>
+<td>Reweights player shot distributions, then renormalizes</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Offensive rebounding aggressiveness</td>
+<td>Rate</td>
+<td>How many players crash vs get back</td>
+<td>Team offensive rebound chances; opponent transition frequency</td>
+<td>Crash vs get-back decision</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Play-type mix</td>
+<td>Distribution</td>
+<td>Shares of isolation, pick-and-roll, post-up, handoff, off-screen, and cut</td>
+<td>Team play types (spot-up, transition, and putbacks excluded)</td>
+<td>Which half-court action is called</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Usage concentration</td>
+<td>Rate</td>
+<td>Running the offense through a star vs sharing it</td>
+<td>Spread of usage across the rotation</td>
+<td>Who each action is run for</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Mismatch hunting</td>
+<td>Rate</td>
+<td>How deliberately the offense targets mismatches</td>
+<td>Matchup data: how often top scorers attack the weakest defender</td>
+<td>Steering actions toward mismatches</td>
+<td>Proxied</td>
+</tr>
+</tbody>
+</table>
+<h2>Defense</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Drives in engine</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zone frequency</td>
+<td>Rate</td>
+<td>Share of possessions played in zone</td>
+<td>Little public data; default low</td>
+<td>Zone vs man each possession</td>
+<td>Assigned</td>
+</tr>
+<tr>
+<td>Defensive rebounding aggressiveness</td>
+<td>Rate</td>
+<td>Gang rebounding vs leaking out</td>
+<td>Opponent OREB% allowed; own transition frequency</td>
+<td>Box-out vs leak-out</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Screen coverage</td>
+<td>Distribution</td>
+<td>Base shares of switch, drop, and blitz, adjusted for the defenders involved</td>
+<td>Switch: how often bigs guard guards in matchup data. Drop and blitz: no public data</td>
+<td>Coverage on each ball screen</td>
+<td>Proxied / Assigned</td>
+</tr>
+<tr>
+<td>Help defense</td>
+<td>Rate</td>
+<td>Helping off shooters vs staying home</td>
+<td>Opponent rim frequency vs wide-open threes allowed</td>
+<td>Help decision on drives</td>
+<td>Proxied</td>
+</tr>
+<tr>
+<td>Matchup assignment</td>
+<td>Rate</td>
+<td>Positional assignments vs best defender on best scorer</td>
+<td>Matchup data: who guards opponents' top scorers</td>
+<td>Initial defensive assignments</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Ball pressure</td>
+<td>Rate</td>
+<td>Denying passing lanes and gambling for steals and blocks</td>
+<td>Team deflections; opponent TOV%; team fouls</td>
+<td>Scales player steal and block tendencies</td>
+<td>Proxied</td>
+</tr>
+</tbody>
+</table>
+<h2>Lineup selection</h2>
+<p>All lineup settings drive one thing: minutes allocation. Quality is the baseline; the preferences tilt around it and never override it outright. Calibrate by checking each coach's simulated minutes against his real rotations.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Definition</th>
+<th>Estimated from</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Quality</td>
+<td>Weight on overall player value</td>
+<td>Real minutes compared with player value</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Height preference</td>
+<td>Tilt toward size</td>
+<td>Minutes given compared with quality-predicted minutes</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Offensive vs defensive preference</td>
+<td>One slider between offensively and defensively skilled players (see open decisions)</td>
+<td>Minutes given compared with quality-predicted minutes</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Spacing preference</td>
+<td>Tilt toward good, high-volume three-point shooters</td>
+<td>Minutes given compared with quality-predicted minutes</td>
+<td>Calibrated</td>
+</tr>
+<tr>
+<td>Depth</td>
+<td>Rotation size</td>
+<td>Players above a minutes threshold</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Stagger vs together</td>
+<td>Whether top players share or split minutes</td>
+<td>Lineup data: overlap of top players' minutes</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Rest / load management</td>
+<td>Resting players on back-to-backs and in blowouts</td>
+<td>Game logs; play-by-play</td>
+<td>Measured</td>
+</tr>
+<tr>
+<td>Foul-trouble handling</td>
+<td>When players sit after early fouls</td>
+<td>Play-by-play fouls and substitutions</td>
+<td>Measured</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h1>Identifiability notes</h1>
+<p>In these pairs, the data only shows the combined result, so one side is estimated and the other is fitted to match the real outcome.</p>
+<table>
+<thead>
+<tr>
+<th>Pair</th>
+<th>What the data shows</th>
+<th>Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dunk ratings / Dunk tendency</td>
+<td>Dunk rate only</td>
+<td>Derive dunk ratings from Vertical, Height, and finishing; fit Dunk tendency</td>
+</tr>
+<tr>
+<td>Draw foul / Flop</td>
+<td>Fouls drawn, not attempts</td>
+<td>Assign Flop; fit Draw foul given Flop</td>
+</tr>
+<tr>
+<td>Block rating / Block tendency</td>
+<td>Blocks and fouls</td>
+<td>Fit both jointly; fouls separate attempts from success</td>
+</tr>
+<tr>
+<td>Steal rating / Steal tendency</td>
+<td>Steals, deflections, and fouls</td>
+<td>Fit both jointly</td>
+</tr>
+<tr>
+<td>Offensive rebounding / crash tendency</td>
+<td>Tracking rebound chances vs rebounds</td>
+<td>Tracking data separates them directly</td>
+</tr>
+<tr>
+<td>Player shot distribution / coach shot preference</td>
+<td>Team shot profile</td>
+<td>Players who change teams separate player from system</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h1>Open decisions</h1>
+<p>These are provisional choices made in this spec. Confirm or change them.</p>
+<ol>
+<li><strong>Aggression</strong> is defined here as defensive physicality, holding the part of each player's foul rate that block, steal, and contest events don't explain. The alternative is to drop it, since the Drive, Iso, and Shot tendencies already cover offensive aggression.</li>
+<li><strong>Pop/roll</strong> was dropped from the latest list but is re-added here. Without it, the engine has no way to decide what a screener does after the screen.</li>
+<li><strong>Offensive vs defensive preference</strong> are merged into one slider, because as defined they are opposite ends of the same choice. Consider adding a separate creation preference, which would give the ball-handler scarcity system a coach-side counterpart.</li>
+<li><strong>Versatility</strong> is derived from other ratings rather than stored, so it can't drift out of sync with them.</li>
+<li><strong>Clutch vs Pressure</strong> are kept distinct: Clutch covers late-and-close situations in any game, and Pressure covers high-stakes games such as the playoffs.</li>
+</ol>
+
+</body></html>
