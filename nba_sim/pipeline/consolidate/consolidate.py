@@ -15,8 +15,8 @@ SEASONS = ['2023-24', '2024-25', '2025-26']
 
 def build_boxscore_player_combined(season: str):
 
-    boxscoreBase = BoxScorePlayer(season, 'PerGame', 'Base')
-    boxscoreAdv = BoxScorePlayer(season, 'PerGame', 'Advanced')
+    boxscoreBase = BoxScorePlayer(season, 'Totals', 'Base')
+    boxscoreAdv = BoxScorePlayer(season, 'Totals', 'Advanced')
 
     sources = [
         (boxscoreBase, ['PLAYER_NAME', 'TEAM_ID', 'AGE', 'GP', 'W', 'L', 
@@ -45,7 +45,7 @@ def build_boxscore_player_combined(season: str):
 # save player box score data for all seasons as csv
 def build_boxscore(save: bool):
     columns = ['PLAYER_ID', 'PLAYER_NAME', 'TEAM_ID', 'SEASON', 'AGE', 'GP', 'W', 'L', 
-               'MIN', 'FGM', 'FGA', 'FGM', 'FG_PCT', 'FG3M', 'FG3A', 'FG3_PCT', 'FTM', 
+               'MIN', 'FGM', 'FGA', 'FG_PCT', 'FG3M', 'FG3A', 'FG3_PCT', 'FTM', 
                'FTA', 'FT_PCT', 'OREB', 'DREB', 'AST', 'TOV', 'STL', 'BLK', 'BLKA', 
                'PF', 'PFD', 'PTS', 'PLUS_MINUS', 'DD2', 'TD3', 'NBA_FANTASY_PTS', 
                'TEAM_COUNT', 'OFF_RATING', 'E_OFF_RATING', 'DEF_RATING', 
@@ -62,14 +62,15 @@ def build_boxscore(save: bool):
         combined.insert(0, "SEASON", season)
         if (save):
             combined.to_csv(f'nba_sim/data/raw/{season}/boxscore_player.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/boxscore_player.csv")
 
         all_seasons.append(combined)
 
 
 def build_boxscore_team_combined(season: str):
 
-    boxscoreBase = BoxScoreTeam(season, 'PerGame', 'Base')
-    boxscoreAdv = BoxScoreTeam(season, 'PerGame', 'Advanced')
+    boxscoreBase = BoxScoreTeam(season, 'Totals', 'Base')
+    boxscoreAdv = BoxScoreTeam(season, 'Totals', 'Advanced')
 
     combined = boxscoreBase.merge(boxscoreAdv, on="TEAM_ID")
 
@@ -81,16 +82,64 @@ def build_boxscore_team(save: bool):
     for season in SEASONS:
         combined = build_boxscore_team_combined(season)
         combined.insert(0, "SEASON", season)
-        combined.to_csv(f'nba_sim/data/raw/{season}/boxscore_team.csv', index=False)
+        if (save):
+            combined.to_csv(f'nba_sim/data/raw/{season}/boxscore_team.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/boxscore_team.csv")
+
+
+
+ROW_CAP = 102_400
 
 # save shot location data for all seasons as csv
 def build_shot_locations(save: bool):
 
     for season in SEASONS:
-        locations = ShotLocations(season, 0, 0, 'FGA')
-        locations.insert(0, "SEASON", season)
+        
+        df = pd.read_csv(f'nba_sim/data/raw/{season}/teamDef.csv')
+        team_ids = df['TEAM_ID'].tolist()
+        
+        season_games = []
+        teams_completed = 0
+
+        for id in team_ids:
+            locations = ShotLocations(season, 0, id, 'FGA')
+            time.sleep(0.9)
+            locations.insert(0, "SEASON", season)
+            season_games.append(locations)
+            teams_completed += 1
+            
+            if (teams_completed % 10 == 0):
+                print(f"teams completed: {teams_completed}")
+
+        all_games = pd.concat(season_games, ignore_index=True)
         if (save):
-            locations.to_csv(f'nba_sim/data/raw/{season}/shotLocations.csv', index=False)
+            all_games.to_csv(f'nba_sim/data/raw/{season}/shotLocations.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/shotLocations.csv")
+
+
+"""
+    frames = []
+
+    for team in teams.get_teams():
+        df = shotchartdetail.ShotChartDetail(
+            team_id=team["id"],
+            player_id=0,                       # 0 = all players on the team
+            season_nullable=season,
+            season_type_all_star="Regular Season",
+            context_measure_simple="FGA",      # makes and misses
+        ).get_data_frames()[0]
+
+        if len(df) >= ROW_CAP:
+            raise RuntimeError(f"{season} {team['abbreviation']}: hit the row cap, results truncated")
+
+        frames.append(df)
+        time.sleep(0.7)
+
+    shots = pd.concat(frames, ignore_index=True)
+    shots = shots.drop_duplicates(subset=["GAME_ID", "GAME_EVENT_ID"])
+    shots.insert(0, "SEASON", season)
+    return shots
+"""
 
 # save play by play tracking data a game
 def build_playByPlay(save: bool):
@@ -99,19 +148,26 @@ def build_playByPlay(save: bool):
 
         season_games = []
 
-        games = gameFinder(season)['GAME_ID'].unique()
-        print(games)
+        games = gameFinder(season)['GAME_ID']
+        time.sleep(1)
+
+        index = 0
 
         for game in games:
             plays = PlayByPlay(game)
+            time.sleep(0.7)
             plays.insert(0, "SEASON", season)
+            season_games.append(plays)
+            index += 1
+            if index % 500 == 0:
+                print(f"Completed {index} games.")
 
-            
+        all_games = pd.concat(season_games, ignore_index=True)
 
-            season_gamesPD = pd.concat(season_games, ignore_index=True)
-
-            if (save):
-                locations.to_csv(f'LOCATION', index=False)
+        if (save):
+            all_games.to_csv(f'nba_sim/data/raw/{season}/playbyplays.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/playbyplays.csv")
+        
 
 # save player tracking data for all seasons as csv
 def build_player_tracking(save: bool):
@@ -123,7 +179,7 @@ def build_player_tracking(save: bool):
     for season in SEASONS:
 
         for type in types:
-            tracking = PlayerTracking(season, type)
+            tracking = PlayerTracking(season, "Totals", type)
             tracking.insert(0, "SEASON", season)
             if (save):
                 tracking.to_csv(f'nba_sim/data/raw/{season}/player_tracking/{type}.csv', index=False)
@@ -136,11 +192,10 @@ def build_play_types(save: bool):
                   'Spotup', 'Handoff', 'Cut', 'OffScreen', 'Transition', 
                   'OffRebound', 'Misc']
 
-    frames = []
-
     for season in SEASONS:
+        frames = []
         for play_type in play_types:
-            df = PlayTypes(season, play_type)
+            df = PlayTypes(season, "Totals", play_type)
             df.insert(0, "SEASON", season)
             frames.append(df)
             time.sleep(0.6)
@@ -149,6 +204,7 @@ def build_play_types(save: bool):
 
         if save:
             all_play_types.to_csv(f'nba_sim/data/raw/{season}/playTypes.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/playTypes.csv")
 
 def build_hustle(save: bool):
 
@@ -157,8 +213,8 @@ def build_hustle(save: bool):
         hustle.insert(0, "SEASON", season)
         if (save):
             hustle.to_csv(f'nba_sim/data/raw/{season}/hustle.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/hustle.csv")
 
-# TO DOOOOOOOO
 def build_PTDefense(save: bool):
 
     for season in SEASONS:
@@ -181,7 +237,7 @@ def build_PTDefense(save: bool):
             curr_season.to_csv(f'nba_sim/data/raw/{season}/PTDefense.csv', index=False)
             print(f"Saved nba_sim/data/raw/{season}/PTDefense.csv")
 
-# TO DOOOOOOOO
+
 def build_matchups(save: bool):
 
     for season in SEASONS:
@@ -208,7 +264,7 @@ def build_team_opp_offense(save: bool):
 
     for season in SEASONS:
 
-        teamDef = OppOffense(season, '0')
+        teamDef = OppOffense(season, 'Totals', '0')
         teamDef.insert(0, "SEASON", season)
         if (save):
             teamDef.to_csv(f'nba_sim/data/raw/{season}/teamDef.csv', index=False)
@@ -247,6 +303,7 @@ def build_combineInfo(save: bool):
 
     if save:
         df.to_csv(f'nba_sim/data/raw/{season}/combine_info.csv', index=False)
+        print(f"Saved nba_sim/data/raw/{season}/combine_info.csv")
 
     return df
 
@@ -283,6 +340,7 @@ def build_combineResults(save: bool):
 
     if save:
         df.to_csv(f'nba_sim/data/raw/{season}/combine_drill_results.csv', index=False)
+        print(f"Saved nba_sim/data/raw/{season}/combine_drill_results.csv")
 
     return df
 
@@ -305,21 +363,25 @@ def build_lineups(save: bool):
 
         if (save):
             curr_season.to_csv(f'nba_sim/data/raw/{season}/lineups.csv', index=False)
+            print(f"Saved nba_sim/data/raw/{season}/lineups.csv")
 
 
 def main() -> int:
 
-    #build_boxscore_team(False)
-    #build_shot_locations(True)
-    build_playByPlay(False)
-    #build_player_tracking(True)
-    #build_play_types(True)
-    #build_hustle(True)
-    #build_PTDefense(True)
-    #build_team_opp_offense(True)
-    #build_combineInfo(True)
-    #build_combineResults(True)
-    #build_lineups(True)
+
+    # build_boxscore(True)
+    # build_boxscore_team(True)
+    build_shot_locations(True)
+    # build_playByPlay(True) # completed
+    # build_player_tracking(True)
+    # build_play_types(True)
+    # build_hustle(True)
+    # build_PTDefense(True)
+    # build_matchups(True)
+    # build_team_opp_offense(True)
+    # build_combineInfo(True)
+    # build_combineResults(True)
+    # build_lineups(True)
 
     return 0
 

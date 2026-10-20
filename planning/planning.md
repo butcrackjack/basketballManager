@@ -13,6 +13,10 @@ Normalize, regress
 
 Skills + Tendencies
 
+## Priors (temporary attribute changes) per match
+
+Temporary
+
 ## Possession Engine
 
 Simluates a possession

@@ -1,4 +1,4 @@
-nba_id,Player,Seasons,Team,Pos,MPG,LEBRON,O-LEBRON,D-LEBRON,WAR,OffRole,DefRole
+PLAYER_ID,Player,SEASON,TEAM_ABBREVIATION,POSITION,MPG,LEBRON,O-LEBRON,D-LEBRON,WAR,OffRole,DefRole
 2544,Lebron James,2025,LAL,SF,34.921,1.551,1.739,-0.188,6.165,Shot Creator,Helper
 101108,Chris Paul,2025,SAS,PG,27.953,-0.114,0.07,-0.184,3.368,Shot Creator,Low Activity
 200768,Kyle Lowry,2025,PHI,PG,18.841,-0.522,-1.388,0.866,0.799,Movement Shooter,Helper

@@ -1,4 +1,4 @@
-nba_id,Player,Seasons,Team,Pos,MPG,LEBRON,O-LEBRON,D-LEBRON,WAR,OffRole,DefRole
+PLAYER_ID,Player,SEASON,TEAM_ABBREVIATION,POSITION,MPG,LEBRON,O-LEBRON,D-LEBRON,WAR,OffRole,DefRole
 2544,Lebron James,2026,LAL,SF,33.15,2.491,2.095,0.396,6.154,Shot Creator,Helper
 101108,Chris Paul,2026,LAC,PG,14.221,-1.196,-1.015,-0.181,0.18,Primary Ball Handler,Chaser
 200768,Kyle Lowry,2026,PHI,PG,8.43,-1.613,-0.834,-0.779,0.063,Movement Shooter,Chaser

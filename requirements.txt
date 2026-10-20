@@ -2,3 +2,5 @@ nba-api
 requests
 pandas
 numpy
+pyarrow
+duckdb

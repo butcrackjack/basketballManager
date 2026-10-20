@@ -1,0 +1,84 @@
+Params
+->
+Model converting stats to attributes
+	- several different stats contribute to a single attribute
+	- develop algorithm to give "overall" rating, can be a simple sum of attributes or a more relevant measure of if important attributes overlap for player context (i.e. small guard having high interior defense isn't as impactful as perimeter defense)
+	- most attributes will be filled in, others need manual input, which I will do based on own knowledge, or based on where the players overall currently sits (might need to be pushed up or down)
+	- need to develop model with visible weighting for each attribute, where it comes from and how much it contributes to overall
+	- should download nba 2k database to run comparison between their ratings and mine, not where biggest discrepancies are and why they exist or if they are valid
+->
+model to simulate stats in season to lead to outcomes
+	- consider many factors within a team (synergy, balance, weak points, morale (eventually), coach preferences, player attributes and tendencies)
+	- will be possession by possession calculation
+	- give a "randomness" variable, games aren't predictable
+
+	Possible: possession by possession model
+	- each possession calculated by who is on court
+	- outcome of shot or turnover first of all
+	- who has the ball based on player tendencies and coach preference, which also dictates the action, shoot (from where), turnover, foul, how much time passes
+		- chance of event happening based on current shooter, defender ????
+	- other team gets ball, repeat
+	- on stoppage, calculate chance of substitution and who it would be, adjust lineups if triggered
+	- the outcome of the play and who does what is all that needs to be calculated 
+		- state variables to keep track of who is on court and stats
+	- once I have this model simulating, can adjust the knobs to fit final scores based off data
+->
+
+
+
+GNN:
+League Graph
+↓
+Player Embeddings Updated
+↓
+Dense Network
+↓
+Predicted Box Score
+
+GNN:
+- each node represents a player, with associated attributes as values in each dimension. An edge between two players mean they are able to see the other player, their attributes are related. So, on the next layer of the network, the node's new adjusted position is altered slightly, based on this relationship
+
+GNN would be very useful at predicting a players temporary attributes for a given game. E.g. Tatum has base 3pt shot of 90, but with Jaylen brown out, high morale, and playing against the wizards (bad perimeter D), this rating would be higher for this game, maybe a 92. This would impact the possession by possession simulation, giving him a higher percentage for every 3pt shot the engine allocates for him.
+
+Possible idea: Two graphs
+1. Teammate chemistry, edges show shared minutes, net rating and lineup data, capturing chemistry, spacing, fit
+2. Matchup Graph, connecting players with their likely matchups, learning the effect the defender has on the performance
+
+GNN (INPUTS):
+Player Embeddings
+Lineup
+Teammates
+Opponent
+Expected Matchups
+
+GNN (OUTPUTS):
+Usage Rate
+Assist Rate
+Rebound Rate
+Shot Distribution
+Efficiency
+Minutes
+
+Use these outputted probabilities in possession simulator
+
+
+
+ARCHITECTURE:
+
+1. Autoencoder (VAE)
+- take historical data relative to minutes played and league averages for each category
+- gives an output vector with probabilities for each attribute, with a standard deviation for natural error
+
+2. Graph Neural Network 
+- two separate GNNs
+- 1. within team relationships, learn how players perform with each other (chemistry, spacing, fit)
+- 2. Matchup graph of relationships between player and likely matchup, gives a probability for this to allow calculation for the impact of matchups
+- output of both of these networks result in "temporary attribute adjustments" from base attributes, which influence gameplay based on the factors mentioned, as well as others such as current morale, recent form etc. These temporary attributes are carried into next game
+
+3. Possession simulator for a given game
+- every possession outcome is determine based upon the GNN attributes and the player's on the court and their tendencies
+- outcome either shot or turnover or foul
+- correct this model based upon historical game data
+- Possible: calculate possessions prior to game
+- for individual action example, tatum might have 38% 3pt irl, distribute the chance of making the shot around this, meaning a single shot might have
+- talent should account for 80-90% and GNN should be around 10-20%

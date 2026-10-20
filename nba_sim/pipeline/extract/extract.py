@@ -6,7 +6,6 @@ from basketball_reference_web_scraper import client
 
 # Box Score Player
 def BoxScorePlayer(season: str, mode: str, type:str):
-    print(f"Retrieving {mode}, {type} stats for {season}")
     stats = leaguedashplayerstats.LeagueDashPlayerStats(
         season=season, # '2025-26' or '2024-25' or '2023-24'
         per_mode_detailed=mode,  # Use 'Totals' or 'PerGame'
@@ -21,7 +20,6 @@ def BoxScorePlayer(season: str, mode: str, type:str):
 
 # Box Score Team
 def BoxScoreTeam(season: str, mode: str, type:str):
-    print(f"Retrieving {mode}, {type} stats for {season}")
     stats = leaguedashteamstats.LeagueDashTeamStats(
         season=season, # '2025-26' or '2024-25' or '2023-24'
         per_mode_detailed=mode,  # Use 'Totals' or 'PerGame'
@@ -37,7 +35,6 @@ def BoxScoreTeam(season: str, mode: str, type:str):
 # Shot Locations
 def ShotLocations(season: str, player_id: int, team_id: int, metric: str):
 
-    print(f"Retrieving {metric} for player {player_id}, on team {team_id} stats for {season}")
     chart = shotchartdetail.ShotChartDetail(
         season_nullable=season, # '2025-26' or '2024-25' or '2023-24'
         player_id=player_id, # keep 0 for general query, id retrieved from BoxScorePlayer
@@ -53,11 +50,8 @@ def ShotLocations(season: str, player_id: int, team_id: int, metric: str):
 
 # Play by Play
 def PlayByPlay(game_id: str):
-
-    print(f"Retrieving play by play for game {game_id}.")
     playbyplay = playbyplayv3.PlayByPlayV3(
         game_id=game_id,
-        
     )
 
     # Convert to pandas dataframe
@@ -67,9 +61,9 @@ def PlayByPlay(game_id: str):
 
 
 # Player Tracking Stats
-def PlayerTracking(season:str, measure_type: str):
+def PlayerTracking(season:str, mode: str, measure_type: str):
     playertracking = leaguedashptstats.LeagueDashPtStats(
-        per_mode_simple='PerGame',
+        per_mode_simple=mode,
         pt_measure_type=measure_type, # (SpeedDistance)|(Rebounding)|(Possessions)|(CatchShoot)|(PullUpShot)|(Defense)|(Drives)|(Passing)|(ElbowTouch)|(PostTouch)|(PaintTouch)|(Efficiency)
         player_or_team='Player',
         season=season
@@ -81,12 +75,10 @@ def PlayerTracking(season:str, measure_type: str):
 
 
 # play types
-def PlayTypes(season: str, playType: str):
-
-    print(playType)
+def PlayTypes(season: str, mode: str, playType: str):
 
     playTypes = synergyplaytypes.SynergyPlayTypes(
-        per_mode_simple='PerGame',
+        per_mode_simple=mode,
         player_or_team_abbreviation='P',
         season_type_all_star="Regular Season",
         type_grouping_nullable="offensive",
@@ -96,8 +88,6 @@ def PlayTypes(season: str, playType: str):
 
     df = playTypes.get_data_frames()[0]
 
-    #print(df.head())
-
     return df
 
 
@@ -105,7 +95,7 @@ def PlayTypes(season: str, playType: str):
 def Hustle(season: str):
 
     hustle = leaguehustlestatsplayer.LeagueHustleStatsPlayer(
-        per_mode_time='Per48',
+        per_mode_time='Totals',
         season=season
     )
 
@@ -132,7 +122,8 @@ def Matchups(season: str, player_id: str):
 
     hustle = leagueseasonmatchups.LeagueSeasonMatchups(
         season=season,
-        def_player_id_nullable=player_id
+        def_player_id_nullable=player_id,
+        per_mode_simple="Totals"
     )
 
     df = hustle.get_data_frames()[0]
@@ -141,11 +132,11 @@ def Matchups(season: str, player_id: str):
 
 
 # Opponent offensive stats
-def OppOffense(season: str, team_id: str):
+def OppOffense(season: str, mode: str, team_id: str):
 
     hustle = leaguedashoppptshot.LeagueDashOppPtShot(
         season=season,
-        per_mode_simple='PerGame',
+        per_mode_simple=mode,
         season_type_all_star="Regular Season",
         team_id_nullable=int(team_id)
     )
@@ -189,7 +180,8 @@ def LeagueLineups(season: str, team_id: str):
 
     hustle = leaguedashlineups.LeagueDashLineups(
         season=season,
-        team_id_nullable=team_id
+        team_id_nullable=team_id,
+        per_mode_detailed='Totals'
     )
 
     df = hustle.get_data_frames()[0]
@@ -197,16 +189,22 @@ def LeagueLineups(season: str, team_id: str):
     return df
 
 
-def gameFinder(season: str):
+def gameFinder(season: str, game_type: str = "Regular Season"):
 
-    games = leaguegamefinder.LeagueGameFinder(
-        season_nullable=season
-    )
+    df = leaguegamefinder.LeagueGameFinder(
+        season_nullable=season,
+        season_type_nullable=game_type,
+        league_id_nullable="00",
+    ).get_data_frames()[0]
 
-    df = games.get_data_frames()[0]
+    df["IS_HOME"] = df["MATCHUP"].str.contains("vs.", regex=False)
+    df = df.sort_values(["GAME_ID", "IS_HOME"], ascending=[True, False])
+    df["SIDE"] = df.groupby("GAME_ID").cumcount().map({0: "HOME", 1: "AWAY"})
 
-    return df
+    home = df[df["SIDE"] == "HOME"].drop(columns=["IS_HOME", "SIDE"])
+    away = df[df["SIDE"] == "AWAY"].drop(columns=["IS_HOME", "SIDE"])
 
+    return home.merge(away, on="GAME_ID", suffixes=("_HOME", "_AWAY"))
 
 #BoxScoreTeam('2025-26', 'PerGame', 'Base')
 
@@ -214,11 +212,11 @@ def gameFinder(season: str):
 
 #PlayTypes('2025-26', 'Isolation', '203468')
 
-#Hustle('2025-26', '2544')
+#print(Hustle('2025-26').columns)
 
 #print(PTDefense('2025-26', '0'))
 
-#Matchups('2025-26', '1642843')
+#print(Matchups('2023-24', '203932')['TEAM_PTS'])
 
 #print(OppOffense('2025-26', '0').columns)
 
@@ -226,8 +224,6 @@ def gameFinder(season: str):
 
 #CombineDrillResults('203468','2013')
 
-#print(LeagueLineups('2025-26','0').columns)
+#df = LeagueLineups('2025-26','1610612764')
 
 #print(gameFinder('2025-26').columns)
-
-
