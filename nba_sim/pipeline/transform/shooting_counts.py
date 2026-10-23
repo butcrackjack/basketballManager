@@ -40,9 +40,9 @@ COUNT_SOURCES = [
     # Enable once the CatchShoot and PullUpShot tracking pulls (Totals) are staged.
     # Check the table and column names match your staging first.
     CountSource("three_cs", "tracking_catch_shoot",
-                "catch_shoot_fg3m", "catch_shoot_fg3a", enabled=False),
+                "catch_shoot_fg3m", "catch_shoot_fg3a", enabled=True),
     CountSource("three_pu", "tracking_pull_up",
-                "pull_up_fg3m", "pull_up_fg3a", enabled=False),
+                "pull_up_fg3m", "pull_up_fg3a", enabled=True),
 ]
 
 
@@ -150,6 +150,7 @@ def print_summary(con) -> None:
 
 def main() -> int:
     con = duckdb.connect(DB_PATH)
+    print(con.execute("SHOW TABLES;").fetchall())
     con.execute("SHOW TABLES").fetchall()
     con.execute("SELECT table_name FROM duckdb_tables;").fetchall()
     try:

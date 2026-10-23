@@ -20,7 +20,7 @@ def convert_season_lebron():
         df.to_parquet(path, index=False)
 
         counts = df['SEASON'].value_counts()
-        print(counts)
+        #print(counts)
         season += 1
 
 
@@ -37,7 +37,7 @@ def convert_made_flag_pbp():
         print(f"Updated nba_sim/data/parquet/{season}/playbyplays.parquet")
 
         counts = df['SHOT_MADE_FLAG'].value_counts()
-        print(counts)
+        #print(counts)
 
 
 # convert shot made flag and shot value to be correct for free throws
@@ -63,7 +63,7 @@ def convert_made_flag_and_ft():
 
         fg_made = (df["SHOT_MADE_FLAG"] & (df["IS_FIELD_GOAL"] == 1)).sum()
         ft_made = (df["SHOT_MADE_FLAG"] & is_ft).sum()
-        print(f"{season}: {fg_made} made FGs, {ft_made} made FTs")
+        #print(f"{season}: {fg_made} made FGs, {ft_made} made FTs")
 
 # convert EVENT_TYPE in shotLocations to bool
 def convert_event_type_shotLoc():
@@ -78,5 +78,10 @@ def convert_event_type_shotLoc():
         print(f"Updated nba_sim/data/parquet/{season}/shotLocations.parquet")
 
         counts = df['EVENT_TYPE'].value_counts()
-        print(counts)
+        #print(counts)
 
+
+convert_season_lebron()
+convert_made_flag_pbp()
+convert_made_flag_and_ft()
+convert_event_type_shotLoc()

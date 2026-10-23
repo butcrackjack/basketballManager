@@ -17,6 +17,7 @@ turnover, so the play-by-play comparison only flags differences larger than 1
 """
 
 import sys
+sys.path.insert(0, "./nba_sim")
 
 import pandas as pd
 
